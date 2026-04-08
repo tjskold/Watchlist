@@ -328,43 +328,68 @@
 <!-- Add modal -->
 <div class="modal-overlay" id="modal-overlay">
   <div class="modal">
-    <div class="modal-title">
+    <div class="modal-title" id="modal-title">
       Add to Watchlist
       <button class="modal-close" id="modal-close">✕</button>
     </div>
-    <div class="field">
-      <label>Title *</label>
-      <input type="text" id="f-title" placeholder="e.g. Parasite">
+
+    <!-- Film fields -->
+    <div id="film-fields">
+      <div class="field">
+        <label>Title *</label>
+        <input type="text" id="f-title" placeholder="e.g. Parasite">
+      </div>
+      <div class="field">
+        <label>Director</label>
+        <input type="text" id="f-director" placeholder="e.g. Bong Joon-ho">
+      </div>
+      <div class="field">
+        <label>Actors</label>
+        <input type="text" id="f-actors" placeholder="e.g. Song Kang-ho, Choi Woo-shik">
+      </div>
+      <div class="field">
+        <label>Genre</label>
+        <input type="text" id="f-genre" placeholder="e.g. Thriller / Drama">
+      </div>
+      <div class="field">
+        <label>Year</label>
+        <input type="text" id="f-year" placeholder="e.g. 2019">
+      </div>
+      <div class="field">
+        <label>Add to list</label>
+        <select id="f-list">
+          <option value="films">Films</option>
+          <option value="svenska">Svenska</option>
+          <option value="tv">TV &amp; Docs</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Notes (optional)</label>
+        <input type="text" id="f-note" placeholder="e.g. For AA, Russian, etc.">
+      </div>
     </div>
-    <div class="field">
-      <label>Director</label>
-      <input type="text" id="f-director" placeholder="e.g. Bong Joon-ho">
+
+    <!-- Director fields -->
+    <div id="director-fields" style="display:none">
+      <div class="field">
+        <label>Name *</label>
+        <input type="text" id="d-name" placeholder="e.g. Park Chan-wook">
+      </div>
+      <div class="field">
+        <label>Country</label>
+        <input type="text" id="d-country" placeholder="e.g. South Korea">
+      </div>
+      <div class="field">
+        <label>Notable Films</label>
+        <input type="text" id="d-films" placeholder="e.g. Oldboy, The Handmaiden, Stoker">
+      </div>
+      <div class="field">
+        <label>Style / Genre</label>
+        <input type="text" id="d-style" placeholder="e.g. Thriller / Drama">
+      </div>
     </div>
-    <div class="field">
-      <label>Actors</label>
-      <input type="text" id="f-actors" placeholder="e.g. Song Kang-ho, Choi Woo-shik">
-    </div>
-    <div class="field">
-      <label>Genre</label>
-      <input type="text" id="f-genre" placeholder="e.g. Thriller / Drama">
-    </div>
-    <div class="field">
-      <label>Year</label>
-      <input type="text" id="f-year" placeholder="e.g. 2019">
-    </div>
-    <div class="field">
-      <label>Add to list</label>
-      <select id="f-list">
-        <option value="films">Films</option>
-        <option value="svenska">Svenska</option>
-        <option value="tv">TV &amp; Docs</option>
-      </select>
-    </div>
-    <div class="field">
-      <label>Notes (optional)</label>
-      <input type="text" id="f-note" placeholder="e.g. For AA, Russian, etc.">
-    </div>
-    <button class="modal-submit" id="modal-submit">Add to Watchlist</button>
+
+    <button class="modal-submit" id="modal-submit">Add</button>
   </div>
 </div>
 
@@ -515,10 +540,11 @@ var DIRECTORS = [
 ];
 
 // ── State ─────────────────────────────────────────────────────────────────
-var seen = {}, customItems = {films:[], svenska:[], tv:[]};
+var seen = {}, customItems = {films:[], svenska:[], tv:[]}, customDirectors = [];
 try {
   seen = JSON.parse(localStorage.getItem('wl4_seen') || '{}');
   customItems = JSON.parse(localStorage.getItem('wl4_custom') || '{"films":[],"svenska":[],"tv":[]}');
+  customDirectors = JSON.parse(localStorage.getItem('wl4_dirs') || '[]');
 } catch(e) {}
 
 var tab = 'films', filter = 'all', q = '';
@@ -527,6 +553,7 @@ function save() {
   try {
     localStorage.setItem('wl4_seen', JSON.stringify(seen));
     localStorage.setItem('wl4_custom', JSON.stringify(customItems));
+    localStorage.setItem('wl4_dirs', JSON.stringify(customDirectors));
   } catch(e) {}
 }
 
@@ -554,14 +581,16 @@ function render() {
   // ── Directors tab ──────────────────────────────────────────────────────
   if (tab === 'directors') {
     frow.style.display = 'none';
-    document.getElementById('fab').style.display = 'none';
+  
 
+    var allDirs = DIRECTORS.concat(customDirectors);
     var lbl = document.createElement('div');
     lbl.className = 'section-label';
-    lbl.textContent = DIRECTORS.length + ' directors — tap to explore films';
+    lbl.textContent = allDirs.length + ' directors — tap to explore films';
     listEl.appendChild(lbl);
 
-    DIRECTORS.forEach(function(dir) {
+    allDirs.forEach(function(dir) {
+      var isCustom = customDirectors.some(function(d) { return d.name === dir.name; });
       var card = document.createElement('div');
       card.className = 'dcard';
 
@@ -594,12 +623,27 @@ function render() {
           '<div class="dcard-films-label">Films</div>' +
           '<div>'+pillsHtml+'</div>' +
           '<div class="dcard-note">Green = on your watchlist &nbsp;·&nbsp; Gold = not added yet</div>' +
+          (isCustom ? '<button class="delete-btn" style="margin-top:12px">Delete director</button>' : '') +
         '</div>';
 
       // Expand/collapse
       card.querySelector('.dcard-top').addEventListener('click', function() {
         card.classList.toggle('open');
       });
+
+      // Delete custom director
+      if (isCustom) {
+        var delBtn = card.querySelector('.delete-btn');
+        if (delBtn) {
+          delBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            customDirectors = customDirectors.filter(function(d) { return d.name !== dir.name; });
+            save();
+            showToast('Removed "' + dir.name + '"');
+            render();
+          });
+        }
+      }
 
       // Film pill clicks
       card.querySelectorAll('.film-pill').forEach(function(pill) {
@@ -904,15 +948,30 @@ function switchTab(targetTab) {
 
 // ── Modal ─────────────────────────────────────────────────────────────────
 function openModal(prefillTitle) {
-  document.getElementById('f-title').value = prefillTitle || '';
-  document.getElementById('f-director').value = '';
-  document.getElementById('f-actors').value = '';
-  document.getElementById('f-genre').value = '';
-  document.getElementById('f-year').value = '';
-  document.getElementById('f-note').value = '';
-  document.getElementById('f-list').value = tab !== 'directors' ? tab : 'films';
-  document.getElementById('modal-overlay').classList.add('open');
-  document.getElementById('f-title').focus();
+  var isDir = tab === 'directors';
+  document.getElementById('modal-title').childNodes[0].textContent = isDir ? 'Add Director ' : 'Add to Watchlist ';
+  document.getElementById('film-fields').style.display = isDir ? 'none' : 'block';
+  document.getElementById('director-fields').style.display = isDir ? 'block' : 'none';
+  document.getElementById('modal-submit').textContent = isDir ? 'Add Director' : 'Add to Watchlist';
+
+  if (isDir) {
+    document.getElementById('d-name').value = prefillTitle || '';
+    document.getElementById('d-country').value = '';
+    document.getElementById('d-films').value = '';
+    document.getElementById('d-style').value = '';
+    document.getElementById('modal-overlay').classList.add('open');
+    document.getElementById('d-name').focus();
+  } else {
+    document.getElementById('f-title').value = prefillTitle || '';
+    document.getElementById('f-director').value = '';
+    document.getElementById('f-actors').value = '';
+    document.getElementById('f-genre').value = '';
+    document.getElementById('f-year').value = '';
+    document.getElementById('f-note').value = '';
+    document.getElementById('f-list').value = tab !== 'directors' ? tab : 'films';
+    document.getElementById('modal-overlay').classList.add('open');
+    document.getElementById('f-title').focus();
+  }
 }
 
 function closeModal() {
@@ -926,23 +985,39 @@ document.getElementById('modal-overlay').addEventListener('click', function(e) {
 });
 
 document.getElementById('modal-submit').addEventListener('click', function() {
-  var title = document.getElementById('f-title').value.trim();
-  if (!title) { document.getElementById('f-title').focus(); return; }
-  var listKey = document.getElementById('f-list').value;
-  var newItem = {
-    t: title,
-    d: document.getElementById('f-director').value.trim() || 'Unknown',
-    a: document.getElementById('f-actors').value.trim() || '—',
-    g: document.getElementById('f-genre').value.trim() || '—',
-    y: document.getElementById('f-year').value.trim() || 'TBC',
-    n: document.getElementById('f-note').value.trim() || ''
-  };
-  if (!customItems[listKey]) customItems[listKey] = [];
-  customItems[listKey].push(newItem);
-  save();
-  closeModal();
-  switchTab(listKey);
-  showToast('Added "' + title + '"');
+  if (tab === 'directors') {
+    var name = document.getElementById('d-name').value.trim();
+    if (!name) { document.getElementById('d-name').focus(); return; }
+    var newDir = {
+      name: name,
+      country: document.getElementById('d-country').value.trim() || '—',
+      films: document.getElementById('d-films').value.trim().split(',').map(function(s){ return s.trim(); }).filter(Boolean),
+      style: document.getElementById('d-style').value.trim() || '—'
+    };
+    customDirectors.push(newDir);
+    save();
+    closeModal();
+    showToast('Added "' + name + '"');
+    render();
+  } else {
+    var title = document.getElementById('f-title').value.trim();
+    if (!title) { document.getElementById('f-title').focus(); return; }
+    var listKey = document.getElementById('f-list').value;
+    var newItem = {
+      t: title,
+      d: document.getElementById('f-director').value.trim() || 'Unknown',
+      a: document.getElementById('f-actors').value.trim() || '—',
+      g: document.getElementById('f-genre').value.trim() || '—',
+      y: document.getElementById('f-year').value.trim() || 'TBC',
+      n: document.getElementById('f-note').value.trim() || ''
+    };
+    if (!customItems[listKey]) customItems[listKey] = [];
+    customItems[listKey].push(newItem);
+    save();
+    closeModal();
+    switchTab(listKey);
+    showToast('Added "' + title + '"');
+  }
 });
 
 // ── Tab & filter events ───────────────────────────────────────────────────
