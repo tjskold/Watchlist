@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Watchlist</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f7f5f2;
+    color: #1a1a1a;
+    padding-bottom: 80px;
+  }
+
+  header {
+    background: #fff;
+    border-bottom: 2px solid #e0d8ce;
+    padding: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 12px; }
+
+  input[type="search"], input[type="text"], input[type="number"], select {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1.5px solid #ddd;
+    border-radius: 8px;
+    font-size: 15px;
+    background: #f7f5f2;
+    color: #1a1a1a;
+    outline: none;
+    display: block;
+    font-family: inherit;
+  }
+  input[type="search"] { margin-bottom: 10px; }
+  input:focus, select:focus { border-color: #8b5e2a; }
+
+  .tabs {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    margin-bottom: 10px;
+    padding-bottom: 2px;
+  }
+  .tab {
+    padding: 7px 14px;
+    border-radius: 20px;
+    border: 1.5px solid #ddd;
+    background: #fff;
+    font-size: 13px;
+    font-weight: 500;
+    color: #666;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .tab.active { background: #1a1a1a; border-color: #1a1a1a; color: #fff; }
+
+  .filter-row { display: flex; gap: 6px; align-items: center; }
+  .fbtn {
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1.5px solid #ddd;
+    background: #fff;
+    font-size: 12px;
+    color: #666;
+    cursor: pointer;
+  }
+  .fbtn.active { background: #8b5e2a; border-color: #8b5e2a; color: #fff; }
+  .stats { font-size: 12px; color: #999; margin-left: auto; }
+
+  /* List */
+  .list { padding: 12px 16px; }
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #999;
+    margin-bottom: 10px;
+  }
+
+  /* Film Card */
+  .card {
+    background: #fff;
+    border: 1.5px solid #e8e2da;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 8px;
+    -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
+  }
+  .card.seen { background: #f5f3f0; border-color: #e0dbd4; opacity: 0.55; }
+  .card-top { display: flex; align-items: flex-start; gap: 12px; }
+  .info { flex: 1; min-width: 0; }
+  .title-row { display: flex; align-items: baseline; gap: 6px; margin-bottom: 3px; }
+  .title { font-size: 16px; font-weight: 600; color: #1a1a1a; line-height: 1.3; }
+  .card.seen .title { text-decoration: line-through; color: #aaa; }
+  .arrow { font-size: 10px; color: #ccc; transition: transform 0.2s; flex-shrink: 0; margin-top: 2px; }
+  .card.open .arrow { transform: rotate(180deg); }
+  .director { font-size: 13px; color: #777; margin-bottom: 6px; }
+  .card.seen .director { color: #bbb; }
+  .tags { display: flex; flex-wrap: wrap; gap: 5px; }
+  .tag { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: #f0ece6; color: #888; border: 1px solid #e8e2da; }
+  .tag.yr { background: #fdf6ec; color: #8b5e2a; border-color: #f0d9b5; }
+  .tag.nt { background: #eef7f3; color: #2e7a5e; border-color: #b5dfd0; }
+  .card.seen .tag { opacity: 0.4; }
+
+  .circle {
+    width: 30px; height: 30px; border-radius: 50%;
+    border: 2px solid #ddd; background: #fff;
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    margin-top: 1px; transition: all 0.15s;
+  }
+  .card:not(.seen) .circle:hover { border-color: #8b5e2a; }
+  .card.seen .circle { background: #2e7a5e; border-color: #2e7a5e; }
+  .tick { display: none; width: 14px; height: 14px; stroke: #fff; stroke-width: 2.5; fill: none; }
+  .card.seen .tick { display: block; }
+
+  .card-detail { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0ece6; }
+  .card.open .card-detail { display: block; }
+  .drow { display: flex; gap: 8px; margin-bottom: 7px; font-size: 13px; line-height: 1.45; align-items: baseline; }
+  .dlabel { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #bbb; min-width: 54px; flex-shrink: 0; padding-top: 2px; }
+  .dval { color: #444; }
+
+  .rt-row { display: flex; gap: 8px; margin-bottom: 7px; align-items: center; }
+  .rt-score {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 13px; font-weight: 600;
+    padding: 3px 10px 3px 7px; border-radius: 20px;
+    border: 1.5px solid #e8e2da; background: #f7f5f2; color: #555;
+    transition: all 0.2s;
+  }
+  .rt-score.fresh { background: #fff3f0; border-color: #ffb8a8; color: #c0392b; }
+  .rt-score.rotten { background: #f5f3f0; border-color: #ddd; color: #888; }
+  .rt-score.loading { color: #bbb; border-color: #eee; font-style: italic; font-weight: 400; }
+  .rt-tomato { font-size: 14px; line-height: 1; }
+
+  .action-row { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
+  .seen-btn {
+    padding: 7px 16px; border-radius: 20px; font-size: 12px; font-weight: 600;
+    cursor: pointer; border: 1.5px solid #2e7a5e; color: #2e7a5e; background: #eef7f3;
+  }
+  .card.seen .seen-btn { border-color: #ddd; color: #aaa; background: #f5f3f0; }
+  .delete-btn {
+    padding: 7px 12px; border-radius: 20px; font-size: 12px;
+    cursor: pointer; border: 1.5px solid #f0d0d0; color: #c44; background: #fff8f8;
+    margin-left: auto;
+  }
+
+  /* Director cards */
+  .dcard {
+    background: #fff;
+    border: 1.5px solid #e8e2da;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .dcard-top { display: flex; align-items: flex-start; gap: 8px; }
+  .dcard-info { flex: 1; }
+  .dname { font-size: 16px; font-weight: 600; color: #1a1a1a; margin-bottom: 2px; }
+  .dcountry { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #8b5e2a; margin-bottom: 4px; }
+  .dstyle { font-size: 11px; color: #aaa; }
+  .dcard-arrow { font-size: 10px; color: #ccc; transition: transform 0.2s; margin-top: 4px; flex-shrink: 0; }
+  .dcard.open .dcard-arrow { transform: rotate(180deg); }
+
+  .dcard-detail { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0ece6; }
+  .dcard.open .dcard-detail { display: block; }
+
+  .dcard-films-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #bbb; margin-bottom: 8px; }
+
+  .film-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    margin: 3px 4px 3px 0;
+    border: 1.5px solid #e8e2da;
+    background: #f7f5f2;
+    color: #333;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .film-pill:hover { background: #f0ece6; border-color: #d0c8bc; }
+  .film-pill.in-list { background: #eef7f3; border-color: #b5dfd0; color: #2e7a5e; }
+  .film-pill.in-list.is-seen { background: #f0f0f0; border-color: #ddd; color: #aaa; text-decoration: line-through; }
+  .film-pill.not-in-list { background: #fdf6ec; border-color: #f0d9b5; color: #8b5e2a; }
+  .pill-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+
+  .dcard-note { font-size: 12px; color: #999; margin-top: 10px; font-style: italic; }
+
+  /* Floating add button */
+  .fab {
+    position: fixed;
+    bottom: 24px;
+    right: 20px;
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    background: #1a1a1a;
+    color: #fff;
+    font-size: 26px;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+    z-index: 20;
+    transition: background 0.15s, transform 0.15s;
+  }
+  .fab:hover { background: #333; transform: scale(1.08); }
+
+  /* Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 30;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: #fff;
+    border-radius: 18px 18px 0 0;
+    padding: 24px 20px 36px;
+    width: 100%;
+    max-width: 560px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .modal-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .modal-close {
+    font-size: 22px;
+    cursor: pointer;
+    color: #aaa;
+    background: none;
+    border: none;
+    line-height: 1;
+    padding: 0 4px;
+  }
+
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 12px; font-weight: 600; color: #888; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; }
+
+  .modal-submit {
+    width: 100%;
+    padding: 14px;
+    border-radius: 10px;
+    background: #1a1a1a;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    margin-top: 6px;
+  }
+  .modal-submit:hover { background: #333; }
+
+  .empty { text-align: center; padding: 60px 20px; color: #aaa; font-size: 15px; }
+
+  .toast {
+    position: fixed;
+    bottom: 90px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #1a1a1a;
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-size: 13px;
+    opacity: 0;
+    transition: opacity 0.3s, transform 0.3s;
+    pointer-events: none;
+    z-index: 50;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎬 My Watchlist</h1>
+  <input type="search" id="search" placeholder="Search title, director, actor…">
+  <div class="tabs">
+    <button class="tab active" data-tab="films">Films</button>
+    <button class="tab" data-tab="svenska">🇸🇪 Svenska</button>
+    <button class="tab" data-tab="tv">TV & Docs</button>
+    <button class="tab" data-tab="directors">Directors</button>
+  </div>
+  <div class="filter-row" id="frow">
+    <button class="fbtn active" data-f="all">All</button>
+    <button class="fbtn" data-f="unseen">Unseen</button>
+    <button class="fbtn" data-f="seen">Seen</button>
+    <span class="stats" id="stats"></span>
+  </div>
+</header>
+
+<div class="list" id="list"></div>
+
+<!-- Floating add button -->
+<button class="fab" id="fab" title="Add film">＋</button>
+
+<!-- Add modal -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-title">
+      Add to Watchlist
+      <button class="modal-close" id="modal-close">✕</button>
+    </div>
+    <div class="field">
+      <label>Title *</label>
+      <input type="text" id="f-title" placeholder="e.g. Parasite">
+    </div>
+    <div class="field">
+      <label>Director</label>
+      <input type="text" id="f-director" placeholder="e.g. Bong Joon-ho">
+    </div>
+    <div class="field">
+      <label>Actors</label>
+      <input type="text" id="f-actors" placeholder="e.g. Song Kang-ho, Choi Woo-shik">
+    </div>
+    <div class="field">
+      <label>Genre</label>
+      <input type="text" id="f-genre" placeholder="e.g. Thriller / Drama">
+    </div>
+    <div class="field">
+      <label>Year</label>
+      <input type="text" id="f-year" placeholder="e.g. 2019">
+    </div>
+    <div class="field">
+      <label>Add to list</label>
+      <select id="f-list">
+        <option value="films">Films</option>
+        <option value="svenska">Svenska</option>
+        <option value="tv">TV &amp; Docs</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Notes (optional)</label>
+      <input type="text" id="f-note" placeholder="e.g. For AA, Russian, etc.">
+    </div>
+    <button class="modal-submit" id="modal-submit">Add to Watchlist</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Base data ─────────────────────────────────────────────────────────────
+var BASE_FILMS = [
+  {t:"Night on Earth",d:"Jim Jarmusch",a:"Winona Ryder, Gena Rowlands, Roberto Benigni",g:"Drama / Anthology",y:1991},
+  {t:"Gadjo Dilo",d:"Tony Gatlif",a:"Romain Duris, Rona Hartner",g:"Drama / World",y:1997},
+  {t:"Get Out",d:"Jordan Peele",a:"Daniel Kaluuya, Allison Williams",g:"Horror / Thriller",y:2017},
+  {t:"Problemista",d:"Julio Torres",a:"Julio Torres, Tilda Swinton",g:"Comedy / Drama",y:2023},
+  {t:"A Big Bold Beautiful Journey",d:"Kogonada",a:"Margot Robbie, Mahershala Ali",g:"Drama / Sci-Fi",y:2025},
+  {t:"Marty Supreme",d:"Josh Safdie",a:"Timothée Chalamet",g:"Drama",y:2025},
+  {t:"Sinners",d:"Ryan Coogler",a:"Michael B. Jordan",g:"Horror / Drama",y:2025},
+  {t:"Inherent Vice",d:"Paul Thomas Anderson",a:"Joaquin Phoenix, Josh Brolin, Owen Wilson",g:"Neo-noir / Comedy",y:2014},
+  {t:"The Secret Agent",d:"Christopher Hampton",a:"Bob Hoskins, Patricia Arquette",g:"Thriller / Period",y:1996},
+  {t:"The Menu",d:"Mark Mylod",a:"Ralph Fiennes, Anya Taylor-Joy",g:"Thriller / Dark Comedy",y:2022},
+  {t:"Birdman",d:"Alejandro G. Iñárritu",a:"Michael Keaton, Edward Norton, Emma Stone",g:"Drama / Dark Comedy",y:2014},
+  {t:"One Battle After Another",d:"Jacques Audiard",a:"Adam Driver",g:"Drama",y:2025},
+  {t:"Will & Harper",d:"Josh Greenbaum",a:"Will Ferrell, Harper Steele",g:"Documentary",y:2024},
+  {t:"Weapons",d:"Zach Cregger",a:"Julia Garner",g:"Horror",y:2025,n:"skräck"},
+  {t:"Parthenope",d:"Paolo Sorrentino",a:"Celeste Dalla Porta, Gary Oldman",g:"Drama",y:2024},
+  {t:"The Sixth Sense",d:"M. Night Shyamalan",a:"Bruce Willis, Haley Joel Osment",g:"Thriller / Horror",y:1999},
+  {t:"Burnt by the Sun",d:"Nikita Mikhalkov",a:"Nikita Mikhalkov, Oleg Menshikov",g:"Drama / War",y:1994,n:"Russian"},
+  {t:"Kinds of Kindness",d:"Yorgos Lanthimos",a:"Emma Stone, Jesse Plemons, Willem Dafoe",g:"Drama / Dark Comedy",y:2024},
+  {t:"Slumdog Millionaire",d:"Danny Boyle",a:"Dev Patel, Freida Pinto",g:"Drama / Romance",y:2008},
+  {t:"Short Cuts",d:"Robert Altman",a:"Tim Robbins, Julianne Moore, Andie MacDowell",g:"Drama / Anthology",y:1993},
+  {t:"Whiplash",d:"Damien Chazelle",a:"Miles Teller, J.K. Simmons",g:"Drama / Music",y:2014},
+  {t:"Dream Scenario",d:"Kristoffer Borgli",a:"Nicolas Cage, Julianne Nicholson",g:"Comedy / Fantasy",y:2023},
+  {t:"Big Fish",d:"Tim Burton",a:"Ewan McGregor, Albert Finney, Helena Bonham Carter",g:"Fantasy / Drama",y:2003},
+  {t:"Ninjababy",d:"Yngvild Sve Flikke",a:"Kristine Kujath Thorp",g:"Comedy / Drama",y:2021},
+  {t:"Nightmare Alley",d:"Guillermo del Toro",a:"Bradley Cooper, Cate Blanchett",g:"Neo-noir / Thriller",y:2021},
+  {t:"Unbreakable",d:"M. Night Shyamalan",a:"Bruce Willis, Samuel L. Jackson",g:"Thriller",y:2000,n:"Trilogy pt.1"},
+  {t:"Split",d:"M. Night Shyamalan",a:"James McAvoy, Anya Taylor-Joy",g:"Thriller / Horror",y:2016,n:"Trilogy pt.2"},
+  {t:"Glass",d:"M. Night Shyamalan",a:"Bruce Willis, James McAvoy, Samuel L. Jackson",g:"Thriller",y:2019,n:"Trilogy pt.3"},
+  {t:"Stealing Beauty",d:"Bernardo Bertolucci",a:"Liv Tyler, Jeremy Irons",g:"Drama / Romance",y:1996},
+  {t:"The Dreamers",d:"Bernardo Bertolucci",a:"Michael Pitt, Eva Green",g:"Drama",y:2003},
+  {t:"Official Secrets",d:"Gavin Hood",a:"Keira Knightley, Matt Smith",g:"Thriller / Drama",y:2019,n:"Iraq War"},
+  {t:"Midsommar",d:"Ari Aster",a:"Florence Pugh, Jack Reynor",g:"Folk Horror",y:2019},
+  {t:"Dune",d:"Denis Villeneuve",a:"Timothée Chalamet, Zendaya",g:"Sci-Fi / Epic",y:2021},
+  {t:"Copenhagen",d:"Mark Raso",a:"Gethin Anthony, Frederikke Dahl Hansen",g:"Drama / Romance",y:2014},
+  {t:"Hidden Figures",d:"Theodore Melfi",a:"Taraji P. Henson, Octavia Spencer, Janelle Monáe",g:"Drama / History",y:2016},
+  {t:"Tag",d:"Jeff Tomsic",a:"Jeremy Renner, Ed Helms, Jon Hamm",g:"Action / Comedy",y:2018},
+  {t:"In Order of Disappearance",d:"Hans Petter Moland",a:"Stellan Skarsgård",g:"Crime / Dark Comedy",y:2014,n:"Norwegian"},
+  {t:"Becoming Zlatan",d:"Fredrik Gertten",a:"Zlatan Ibrahimović",g:"Documentary",y:2015},
+  {t:"Silver Linings Playbook",d:"David O. Russell",a:"Bradley Cooper, Jennifer Lawrence",g:"Drama / Romance",y:2012},
+  {t:"Wedding Crashers",d:"David Dobkin",a:"Owen Wilson, Vince Vaughn",g:"Comedy / Romance",y:2005},
+  {t:"Dogma",d:"Kevin Smith",a:"Ben Affleck, Matt Damon, Jay & Silent Bob",g:"Comedy / Fantasy",y:1999},
+  {t:"Beasts of the Southern Wild",d:"Benh Zeitlin",a:"Quvenzhané Wallis",g:"Drama / Fantasy",y:2012},
+  {t:"Heathers",d:"Michael Lehmann",a:"Winona Ryder, Christian Slater",g:"Dark Comedy / Thriller",y:1988},
+  {t:"Desert Flower",d:"Sherry Hormann",a:"Liya Kebede, Sally Hawkins",g:"Drama / Biography",y:2009},
+  {t:"Florence Foster Jenkins",d:"Stephen Frears",a:"Meryl Streep, Hugh Grant",g:"Drama / Biography",y:2016},
+  {t:"Love & Friendship",d:"Whit Stillman",a:"Kate Beckinsale, Chloë Sevigny",g:"Comedy / Period",y:2016},
+  {t:"The Hateful Eight",d:"Quentin Tarantino",a:"Samuel L. Jackson, Kurt Russell, Jennifer Jason Leigh",g:"Western / Thriller",y:2015},
+  {t:"Leviathan",d:"Andrey Zvyagintsev",a:"Aleksei Serebryakov, Elena Lyadova",g:"Drama",y:2014,n:"Russian"},
+  {t:"Boyhood",d:"Richard Linklater",a:"Ellar Coltrane, Patricia Arquette, Ethan Hawke",g:"Drama",y:2014},
+  {t:"El Mariachi Trilogy",d:"Robert Rodriguez",a:"Antonio Banderas, Salma Hayek",g:"Action / Thriller",y:"1992–2003",n:"3 films"},
+  {t:"Millennium Trilogy",d:"Various",a:"Noomi Rapace, Rooney Mara, Daniel Craig",g:"Crime / Thriller",y:"2009–2011",n:"3 films"},
+  {t:"Evil Dead Trilogy",d:"Sam Raimi",a:"Bruce Campbell",g:"Horror / Comedy",y:"1981–1992",n:"3 films"},
+  {t:"Scott Pilgrim vs. the World",d:"Edgar Wright",a:"Michael Cera, Mary Elizabeth Winstead",g:"Action / Comedy",y:2010,n:"For AA"},
+  {t:"Tank Girl",d:"Rachel Talalay",a:"Lori Petty, Ice-T",g:"Action / Sci-Fi",y:1995,n:"For AA"},
+  {t:"Eternal Sunshine of the Spotless Mind",d:"Michel Gondry",a:"Jim Carrey, Kate Winslet",g:"Sci-Fi / Romance",y:2004,n:"For AA"},
+  {t:"Pan",d:"Joe Wright",a:"Hugh Jackman, Rooney Mara",g:"Fantasy / Adventure",y:2015,n:"For AA"},
+  {t:"The Chronicles of Narnia",d:"Andrew Adamson",a:"Tilda Swinton, James McAvoy",g:"Fantasy / Adventure",y:2005,n:"For AA"},
+  {t:"The Secret Life of Walter Mitty",d:"Ben Stiller",a:"Ben Stiller, Kristen Wiig",g:"Adventure / Comedy",y:2013,n:"For AA"},
+  {t:"Bridge to Terabithia",d:"Gábor Csupó",a:"Josh Hutcherson, AnnaSophia Robb",g:"Drama / Fantasy",y:2007,n:"For AA"},
+  {t:"The Book of Life",d:"Jorge R. Gutiérrez",a:"Diego Luna, Zoe Saldana (voice)",g:"Animation / Fantasy",y:2014,n:"For AA"},
+  {t:"Life of Pi",d:"Ang Lee",a:"Suraj Sharma, Irrfan Khan",g:"Drama / Adventure",y:2012,n:"For AA"},
+  {t:"How to Train Your Dragon",d:"Dean DeBlois",a:"Jay Baruchel (voice)",g:"Animation / Adventure",y:2010,n:"For AA"},
+  {t:"Le Grand Bleu",d:"Luc Besson",a:"Jean-Marc Barr, Jean Reno",g:"Drama / Adventure",y:1988,n:"For AA"},
+  {t:"Indiana Jones (series)",d:"Steven Spielberg",a:"Harrison Ford, Karen Allen",g:"Action / Adventure",y:"1981–2023",n:"For AA"},
+  {t:"Dances with Wolves",d:"Kevin Costner",a:"Kevin Costner, Mary McDonnell",g:"Western / Epic",y:1990,n:"For AA"},
+  {t:"Moonrise Kingdom",d:"Wes Anderson",a:"Jared Gilman, Kara Hayward, Bill Murray",g:"Comedy / Romance",y:2012,n:"For AA"},
+  {t:"The Fifth Element",d:"Luc Besson",a:"Bruce Willis, Milla Jovovich",g:"Sci-Fi / Action",y:1997,n:"For AA"},
+  {t:"Waterworld",d:"Kevin Reynolds",a:"Kevin Costner, Dennis Hopper",g:"Sci-Fi / Action",y:1995,n:"For AA"},
+  {t:"Mean Girls",d:"Mark Waters",a:"Lindsay Lohan, Rachel McAdams, Tina Fey",g:"Comedy",y:2004,n:"For AA"},
+  {t:"Lourdes",d:"Jessica Hausner",a:"Sylvie Testud",g:"Drama",y:2009},
+  {t:"Amour Fou",d:"Jessica Hausner",a:"Birte Schnöink, Christian Friedel",g:"Drama / Period",y:2014},
+  {t:"Brian Wilson: Long Promised Road",d:"Brent Wilson",a:"Brian Wilson, Jim Carrey",g:"Documentary / Music",y:2021},
+  {t:"Muscle Shoals",d:"Greg Camalier",a:"Aretha Franklin, Mick Jagger",g:"Documentary / Music",y:2013},
+  {t:"The Number 23",d:"Joel Schumacher",a:"Jim Carrey, Virginia Madsen",g:"Thriller / Mystery",y:2007},
+  {t:"Napoleon Dynamite",d:"Jared Hess",a:"Jon Heder, Efren Ramirez",g:"Comedy",y:2004},
+  {t:"Cloud Atlas",d:"Wachowskis / Tom Tykwer",a:"Tom Hanks, Halle Berry",g:"Sci-Fi / Drama",y:2012},
+  {t:"The Imposter",d:"Bart Layton",a:"Frédéric Bourdin",g:"Documentary / Crime",y:2012},
+  {t:"The Italian Job",d:"F. Gary Gray",a:"Mark Wahlberg, Charlize Theron",g:"Action / Heist",y:2003},
+  {t:"Flight",d:"Robert Zemeckis",a:"Denzel Washington, John Goodman",g:"Drama / Thriller",y:2012},
+  {t:"The Deer Hunter",d:"Michael Cimino",a:"Robert De Niro, Meryl Streep, Christopher Walken",g:"Drama / War",y:1978},
+  {t:"Fair Game",d:"Doug Liman",a:"Naomi Watts, Sean Penn",g:"Drama / Political",y:2010,n:"Iraq WMD"},
+  {t:"Le Week-End",d:"Roger Michell",a:"Jim Broadbent, Lindsay Duncan",g:"Drama / Comedy",y:2013},
+  {t:"The Road",d:"John Hillcoat",a:"Viggo Mortensen, Kodi Smit-McPhee",g:"Drama / Sci-Fi",y:2009},
+  {t:"Chopper",d:"Andrew Dominik",a:"Eric Bana",g:"Crime / Biography",y:2000},
+  {t:"Sucker Punch",d:"Zack Snyder",a:"Emily Browning, Abbie Cornish",g:"Action / Fantasy",y:2011},
+  {t:"Her",d:"Spike Jonze",a:"Joaquin Phoenix, Scarlett Johansson",g:"Sci-Fi / Romance",y:2013},
+  {t:"The White Ribbon",d:"Michael Haneke",a:"Christian Friedel, Ernst Jacobi",g:"Drama / Thriller",y:2009},
+  {t:"Funny Games",d:"Michael Haneke",a:"Naomi Watts, Tim Roth",g:"Thriller / Horror",y:2007},
+  {t:"Caché (Hidden)",d:"Michael Haneke",a:"Daniel Auteuil, Juliette Binoche",g:"Thriller / Mystery",y:2005},
+  {t:"Quadrophenia",d:"Franc Roddam",a:"Phil Daniels, Sting",g:"Drama / Music",y:1979},
+  {t:"House of Games",d:"David Mamet",a:"Lindsay Crouse, Joe Mantegna",g:"Thriller / Drama",y:1987},
+  {t:"Superbad",d:"Greg Mottola",a:"Michael Cera, Jonah Hill",g:"Comedy",y:2007},
+  {t:"Finding Forrester",d:"Gus Van Sant",a:"Sean Connery, Rob Brown",g:"Drama",y:2000},
+  {t:"No Country for Old Men",d:"Coen Brothers",a:"Tommy Lee Jones, Javier Bardem, Josh Brolin",g:"Crime / Thriller",y:2007},
+  {t:"Stoker",d:"Park Chan-wook",a:"Mia Wasikowska, Nicole Kidman, Matthew Goode",g:"Thriller / Drama",y:2013},
+  {t:"Carrie",d:"Brian De Palma",a:"Sissy Spacek, Piper Laurie",g:"Horror",y:1976}
+];
+
+var BASE_SVENSKA = [
+  {t:"Pensionat Oskar",d:"Göran Carmback",a:"Ernst-Hugo Järegård",g:"Comedy",y:1995},
+  {t:"Efterskalv",d:"Måns Månsson",a:"Aliette Opheim",g:"Drama",y:2023},
+  {t:"The Square",d:"Ruben Östlund",a:"Claes Bang, Elisabeth Moss",g:"Drama / Satire",y:2017},
+  {t:"Förvaret",d:"TBC",a:"—",g:"Documentary",y:"TBC"},
+  {t:"The Last Sentence",d:"Jan Troell",a:"Jesper Christensen",g:"Drama / Biography",y:2012,n:"Torgny Segerstedt"},
+  {t:"Hundtricket",d:"Hannes Holm",a:"Gustaf Skarsgård",g:"Comedy / Crime",y:2001},
+  {t:"Jätten",d:"Johannes Nyholm",a:"Christian Zaar",g:"Drama",y:2016},
+  {t:"Vi är bäst!",d:"Lukas Moodysson",a:"Mira Barkhammar, Mira Grosin",g:"Drama / Music",y:2013},
+  {t:"Återträffen",d:"Anna Odell",a:"Anna Odell",g:"Drama",y:2013},
+  {t:"Mig äger ingen",d:"Suzanne Osten",a:"Amanda Ooms",g:"Drama",y:2000},
+  {t:"Let the Right One In",d:"Tomas Alfredson",a:"Kåre Hedebrant, Lina Leandersson",g:"Horror / Drama",y:2008},
+  {t:"Enkel resa till Antibes",d:"Reza Parsa",a:"Fares Fares",g:"Drama",y:1997},
+  {t:"Kan du vissla Johanna",d:"Rumle Hammerich",a:"Per Oscarsson",g:"Drama",y:1994},
+  {t:"Kungen av Strandvägen",d:"TBC",a:"—",g:"Drama",y:"TBC"},
+  {t:"Sagolandet",d:"Stefan Jarl",a:"Documentary",g:"Documentary",y:1988},
+  {t:"Somliga går i trasiga skor",d:"Maud Nycander",a:"Documentary",g:"Documentary",y:2001}
+];
+
+var BASE_TV = [
+  {t:"PBS: Divided States of America",d:"Frontline",a:"Documentary",g:"Documentary / Political",y:2017},
+  {t:"Oslo Stories – Love",d:"Petter Næss",a:"Norwegian ensemble",g:"Drama / Romance",y:2002,n:"Norwegian TV"},
+  {t:"Suecia: Paraíso y Infierno",d:"TBC",a:"—",g:"Documentary",y:"TBC",n:"Spanish doc"},
+  {t:"Hitler: The Rise of Evil",d:"Christian Duguay",a:"Robert Carlyle",g:"Drama / History",y:2003,n:"TV Movie"}
+];
+
+var DIRECTORS = [
+  {name:"Ingmar Bergman",country:"Sweden",films:["The Seventh Seal","Wild Strawberries","Fanny and Alexander","Persona","Scenes from a Marriage"],style:"Drama / Existential"},
+  {name:"Roy Andersson",country:"Sweden",films:["Songs from the Second Floor","You, the Living","A Pigeon Sat on a Branch"],style:"Drama / Dark Comedy"},
+  {name:"Lars von Trier",country:"Denmark",films:["Melancholia","Breaking the Waves","Dancer in the Dark","Dogville","The Idiots"],style:"Drama / Psychological"},
+  {name:"David Lynch",country:"USA",films:["Mulholland Drive","Blue Velvet","Eraserhead","Lost Highway","The Elephant Man"],style:"Surreal / Thriller"},
+  {name:"Robert Altman",country:"USA",films:["Nashville","Short Cuts","MASH","Gosford Park","The Player"],style:"Drama / Ensemble"},
+  {name:"Federico Fellini",country:"Italy",films:["8½","La Dolce Vita","Amarcord","Roma","Satyricon"],style:"Drama / Surreal"},
+  {name:"Stanley Kubrick",country:"UK/USA",films:["2001: A Space Odyssey","The Shining","Full Metal Jacket","A Clockwork Orange","Barry Lyndon"],style:"Various"},
+  {name:"Quentin Tarantino",country:"USA",films:["Pulp Fiction","Inglourious Basterds","Django Unchained","The Hateful Eight","Kill Bill"],style:"Crime / Thriller"},
+  {name:"Coen Brothers",country:"USA",films:["Fargo","No Country for Old Men","The Big Lebowski","Barton Fink","Blood Simple"],style:"Crime / Dark Comedy"},
+  {name:"Martin Scorsese",country:"USA",films:["Taxi Driver","Goodfellas","The Departed","Raging Bull","Mean Streets"],style:"Crime / Drama"},
+  {name:"David Mamet",country:"USA",films:["House of Games","Glengarry Glen Ross","The Spanish Prisoner","Oleanna"],style:"Drama / Thriller"},
+  {name:"Susanne Bier",country:"Denmark",films:["In a Better World","Brothers","After the Wedding","Open Hearts"],style:"Drama"},
+  {name:"Ruben Östlund",country:"Sweden",films:["Force Majeure","The Square","Triangle of Sadness","Play"],style:"Drama / Satire"},
+  {name:"Lasse Hallström",country:"Sweden",films:["My Life as a Dog","What's Eating Gilbert Grape","The Cider House Rules","Chocolat"],style:"Drama"}
+];
+
+// ── State ─────────────────────────────────────────────────────────────────
+var seen = {}, customItems = {films:[], svenska:[], tv:[]};
+try {
+  seen = JSON.parse(localStorage.getItem('wl4_seen') || '{}');
+  customItems = JSON.parse(localStorage.getItem('wl4_custom') || '{"films":[],"svenska":[],"tv":[]}');
+} catch(e) {}
+
+var tab = 'films', filter = 'all', q = '';
+
+function save() {
+  try {
+    localStorage.setItem('wl4_seen', JSON.stringify(seen));
+    localStorage.setItem('wl4_custom', JSON.stringify(customItems));
+  } catch(e) {}
+}
+
+function getItems(tb) {
+  var base = tb === 'films' ? BASE_FILMS : tb === 'svenska' ? BASE_SVENSKA : BASE_TV;
+  return base.concat(customItems[tb] || []);
+}
+
+function k(tb, title) { return tb + '::' + title; }
+
+// ── Toast ─────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function() { t.classList.remove('show'); }, 2200);
+}
+
+// ── Render ────────────────────────────────────────────────────────────────
+function render() {
+  var listEl = document.getElementById('list');
+  listEl.innerHTML = '';
+  var frow = document.getElementById('frow');
+
+  // ── Directors tab ──────────────────────────────────────────────────────
+  if (tab === 'directors') {
+    frow.style.display = 'none';
+    document.getElementById('fab').style.display = 'none';
+
+    var lbl = document.createElement('div');
+    lbl.className = 'section-label';
+    lbl.textContent = DIRECTORS.length + ' directors — tap to explore films';
+    listEl.appendChild(lbl);
+
+    DIRECTORS.forEach(function(dir) {
+      var card = document.createElement('div');
+      card.className = 'dcard';
+
+      // Build film pills — check across all lists
+      var pillsHtml = dir.films.map(function(filmTitle) {
+        var found = null, foundTab = null;
+        ['films','svenska','tv'].forEach(function(tb2) {
+          getItems(tb2).forEach(function(item) {
+            if (item.t.toLowerCase() === filmTitle.toLowerCase()) {
+              found = item; foundTab = tb2;
+            }
+          });
+        });
+        var isSeen = found ? !!seen[k(foundTab, found.t)] : false;
+        var cls = found ? (isSeen ? 'film-pill in-list is-seen' : 'film-pill in-list') : 'film-pill not-in-list';
+        var dot = found ? '<span class="pill-dot"></span>' : '';
+        return '<span class="film-pill '+cls+'" data-film="'+encodeURIComponent(filmTitle)+'" data-tab="'+(foundTab||'')+'">'+ dot + filmTitle +'</span>';
+      }).join('');
+
+      card.innerHTML =
+        '<div class="dcard-top">' +
+          '<div class="dcard-info">' +
+            '<div class="dname">'+dir.name+'</div>' +
+            '<div class="dcountry">'+dir.country+'</div>' +
+            '<div class="dstyle">'+dir.style+'</div>' +
+          '</div>' +
+          '<span class="dcard-arrow">▼</span>' +
+        '</div>' +
+        '<div class="dcard-detail">' +
+          '<div class="dcard-films-label">Films</div>' +
+          '<div>'+pillsHtml+'</div>' +
+          '<div class="dcard-note">Green = on your watchlist &nbsp;·&nbsp; Gold = not added yet</div>' +
+        '</div>';
+
+      // Expand/collapse
+      card.querySelector('.dcard-top').addEventListener('click', function() {
+        card.classList.toggle('open');
+      });
+
+      // Film pill clicks
+      card.querySelectorAll('.film-pill').forEach(function(pill) {
+        pill.addEventListener('click', function(e) {
+          e.stopPropagation();
+          var filmTitle = decodeURIComponent(pill.dataset.film);
+          var targetTab = pill.dataset.tab;
+
+          if (targetTab) {
+            // Switch to that tab and open the card
+            switchTab(targetTab);
+            setTimeout(function() {
+              var cards = document.querySelectorAll('.card');
+              cards.forEach(function(c) {
+                if (c.querySelector('.title') && c.querySelector('.title').textContent === filmTitle) {
+                  c.classList.add('open');
+                  c.scrollIntoView({behavior:'smooth', block:'center'});
+                  c.style.outline = '2px solid #8b5e2a';
+                  setTimeout(function() { c.style.outline = ''; }, 1800);
+                }
+              });
+            }, 80);
+          } else {
+            // Not in list — offer to add
+            openModal(filmTitle);
+          }
+        });
+      });
+
+      listEl.appendChild(card);
+    });
+    return;
+  }
+
+  // ── Film/TV tabs ───────────────────────────────────────────────────────
+  frow.style.display = 'flex';
+  document.getElementById('fab').style.display = 'flex';
+
+  var items = getItems(tab);
+  var sq = q.toLowerCase();
+
+  var visible = items.filter(function(item) {
+    var sk = k(tab, item.t);
+    var isSeen = !!seen[sk];
+    if (filter === 'seen' && !isSeen) return false;
+    if (filter === 'unseen' && isSeen) return false;
+    if (sq && !(item.t.toLowerCase().indexOf(sq) >= 0 ||
+                item.d.toLowerCase().indexOf(sq) >= 0 ||
+                (item.a||'').toLowerCase().indexOf(sq) >= 0)) return false;
+    return true;
+  });
+
+  var seenCount = items.filter(function(i) { return !!seen[k(tab,i.t)]; }).length;
+  document.getElementById('stats').textContent = seenCount + ' / ' + items.length + ' seen';
+
+  if (visible.length === 0) {
+    var em = document.createElement('div');
+    em.className = 'empty';
+    em.textContent = 'No results.';
+    listEl.appendChild(em);
+    return;
+  }
+
+  var lbl2 = document.createElement('div');
+  lbl2.className = 'section-label';
+  lbl2.textContent = visible.length + ' titles — tap for details';
+  listEl.appendChild(lbl2);
+
+  visible.forEach(function(item) {
+    var sk = k(tab, item.t);
+    var isSeen = !!seen[sk];
+    var isCustom = (customItems[tab] || []).some(function(c) { return c.t === item.t; });
+
+    var card = document.createElement('div');
+    card.className = 'card' + (isSeen ? ' seen' : '');
+
+    var tagsHtml = '';
+    if (item.y !== 'TBC') tagsHtml += '<span class="tag yr">'+item.y+'</span>';
+    tagsHtml += '<span class="tag">'+item.g+'</span>';
+    if (item.n) tagsHtml += '<span class="tag nt">'+item.n+'</span>';
+
+    card.innerHTML =
+      '<div class="card-top">' +
+        '<div class="info">' +
+          '<div class="title-row"><span class="title">'+item.t+'</span><span class="arrow">▼</span></div>' +
+          '<div class="director">'+item.d+'</div>' +
+          '<div class="tags">'+tagsHtml+'</div>' +
+        '</div>' +
+        '<div class="circle"><svg class="tick" viewBox="0 0 14 14"><polyline points="2,7 5.5,10.5 12,3"/></svg></div>' +
+      '</div>' +
+      '<div class="card-detail">' +
+        '<div class="drow"><span class="dlabel">Actors</span><span class="dval">'+(item.a||'—')+'</span></div>' +
+        '<div class="drow"><span class="dlabel">Genre</span><span class="dval">'+item.g+'</span></div>' +
+        '<div class="drow"><span class="dlabel">Year</span><span class="dval">'+item.y+'</span></div>' +
+        (item.n ? '<div class="drow"><span class="dlabel">Note</span><span class="dval">'+item.n+'</span></div>' : '') +
+        '<div class="rt-row"><span class="dlabel">Rotten<br>Tomatoes</span><span class="rt-score loading" id="rt-'+sk.replace(/[^a-z0-9]/gi,'-')+'">fetching…</span></div>' +
+        '<div class="action-row">' +
+          '<button class="seen-btn">'+(isSeen ? '✓ Seen — undo' : '+ Mark as seen')+'</button>' +
+          (isCustom ? '<button class="delete-btn">Delete</button>' : '') +
+        '</div>' +
+      '</div>';
+
+    card.querySelector('.card-top').addEventListener('click', function(e) {
+      if (e.target.closest('.circle')) return;
+      card.classList.toggle('open');
+      if (card.classList.contains('open')) {
+        fetchRT(item.t, item.y, sk.replace(/[^a-z0-9]/gi,'-'));
+      }
+    });
+
+    card.querySelector('.circle').addEventListener('click', function(e) {
+      e.stopPropagation();
+      toggleSeen(card, sk, items);
+    });
+
+    card.querySelector('.seen-btn').addEventListener('click', function(e) {
+      e.stopPropagation();
+      toggleSeen(card, sk, items);
+    });
+
+    if (isCustom) {
+      card.querySelector('.delete-btn').addEventListener('click', function(e) {
+        e.stopPropagation();
+        customItems[tab] = (customItems[tab] || []).filter(function(c) { return c.t !== item.t; });
+        delete seen[sk];
+        save();
+        showToast('Removed "' + item.t + '"');
+        render();
+      });
+    }
+
+    listEl.appendChild(card);
+  });
+}
+
+var rtCache = {};
+// Clear old cache to pick up corrected scores
+localStorage.removeItem('wl4_rt');
+function saveRT() { try { localStorage.setItem('wl4_rt', JSON.stringify(rtCache)); } catch(e) {} }
+
+var RT_SCORES = {
+  "Night on Earth": {tomatometer:"82%", status:"fresh"},
+  "Gadjo Dilo": {tomatometer:"95%", status:"fresh"},
+  "Get Out": {tomatometer:"98%", status:"fresh"},
+  "Problemista": {tomatometer:"87%", status:"fresh"},
+  "Marty Supreme": {tomatometer:"93%", status:"fresh"},
+  "Sinners": {tomatometer:"97%", status:"fresh"},
+  "Inherent Vice": {tomatometer:"73%", status:"fresh"},
+  "The Secret Agent": {tomatometer:"55%", status:"rotten"},
+  "The Menu": {tomatometer:"88%", status:"fresh"},
+  "Birdman": {tomatometer:"91%", status:"fresh"},
+  "One Battle After Another": {tomatometer:"94%", status:"fresh"},
+  "Will & Harper": {tomatometer:"92%", status:"fresh"},
+  "Weapons": {tomatometer:"93%", status:"fresh"},
+  "Parthenope": {tomatometer:"67%", status:"fresh"},
+  "The Sixth Sense": {tomatometer:"86%", status:"fresh"},
+  "Burnt by the Sun": {tomatometer:"95%", status:"fresh"},
+  "Kinds of Kindness": {tomatometer:"68%", status:"fresh"},
+  "Slumdog Millionaire": {tomatometer:"91%", status:"fresh"},
+  "Short Cuts": {tomatometer:"88%", status:"fresh"},
+  "Whiplash": {tomatometer:"94%", status:"fresh"},
+  "Dream Scenario": {tomatometer:"89%", status:"fresh"},
+  "Big Fish": {tomatometer:"76%", status:"fresh"},
+  "Ninjababy": {tomatometer:"97%", status:"fresh"},
+  "Nightmare Alley": {tomatometer:"81%", status:"fresh"},
+  "Unbreakable": {tomatometer:"70%", status:"fresh"},
+  "Split": {tomatometer:"77%", status:"fresh"},
+  "Glass": {tomatometer:"37%", status:"rotten"},
+  "Stealing Beauty": {tomatometer:"55%", status:"rotten"},
+  "The Dreamers": {tomatometer:"61%", status:"fresh"},
+  "Official Secrets": {tomatometer:"84%", status:"fresh"},
+  "Midsommar": {tomatometer:"83%", status:"fresh"},
+  "Dune": {tomatometer:"83%", status:"fresh"},
+  "Copenhagen": {tomatometer:"76%", status:"fresh"},
+  "Hidden Figures": {tomatometer:"93%", status:"fresh"},
+  "Tag": {tomatometer:"55%", status:"rotten"},
+  "In Order of Disappearance": {tomatometer:"90%", status:"fresh"},
+  "Becoming Zlatan": {tomatometer:"88%", status:"fresh"},
+  "Silver Linings Playbook": {tomatometer:"92%", status:"fresh"},
+  "Wedding Crashers": {tomatometer:"75%", status:"fresh"},
+  "Dogma": {tomatometer:"67%", status:"fresh"},
+  "Beasts of the Southern Wild": {tomatometer:"86%", status:"fresh"},
+  "Heathers": {tomatometer:"95%", status:"fresh"},
+  "Desert Flower": {tomatometer:"68%", status:"fresh"},
+  "Florence Foster Jenkins": {tomatometer:"87%", status:"fresh"},
+  "Love & Friendship": {tomatometer:"98%", status:"fresh"},
+  "The Hateful Eight": {tomatometer:"74%", status:"fresh"},
+  "Leviathan": {tomatometer:"99%", status:"fresh"},
+  "Boyhood": {tomatometer:"98%", status:"fresh"},
+  "El Mariachi Trilogy": {tomatometer:"94%", status:"fresh"},
+  "Millennium Trilogy": {tomatometer:"97%", status:"fresh"},
+  "Evil Dead Trilogy": {tomatometer:"95%", status:"fresh"},
+  "Scott Pilgrim vs. the World": {tomatometer:"81%", status:"fresh"},
+  "Tank Girl": {tomatometer:"43%", status:"rotten"},
+  "Eternal Sunshine of the Spotless Mind": {tomatometer:"93%", status:"fresh"},
+  "Pan": {tomatometer:"26%", status:"rotten"},
+  "The Chronicles of Narnia": {tomatometer:"76%", status:"fresh"},
+  "The Secret Life of Walter Mitty": {tomatometer:"51%", status:"rotten"},
+  "Bridge to Terabithia": {tomatometer:"85%", status:"fresh"},
+  "The Book of Life": {tomatometer:"80%", status:"fresh"},
+  "Life of Pi": {tomatometer:"87%", status:"fresh"},
+  "How to Train Your Dragon": {tomatometer:"99%", status:"fresh"},
+  "Le Grand Bleu": {tomatometer:"44%", status:"rotten"},
+  "Indiana Jones (series)": {tomatometer:"94%", status:"fresh"},
+  "Dances with Wolves": {tomatometer:"78%", status:"fresh"},
+  "Moonrise Kingdom": {tomatometer:"94%", status:"fresh"},
+  "The Fifth Element": {tomatometer:"71%", status:"fresh"},
+  "Waterworld": {tomatometer:"43%", status:"rotten"},
+  "Mean Girls": {tomatometer:"84%", status:"fresh"},
+  "Lourdes": {tomatometer:"89%", status:"fresh"},
+  "Amour Fou": {tomatometer:"91%", status:"fresh"},
+  "Brian Wilson: Long Promised Road": {tomatometer:"94%", status:"fresh"},
+  "Muscle Shoals": {tomatometer:"98%", status:"fresh"},
+  "The Number 23": {tomatometer:"8%", status:"rotten"},
+  "Napoleon Dynamite": {tomatometer:"71%", status:"fresh"},
+  "Cloud Atlas": {tomatometer:"66%", status:"fresh"},
+  "The Imposter": {tomatometer:"95%", status:"fresh"},
+  "The Italian Job": {tomatometer:"73%", status:"fresh"},
+  "Flight": {tomatometer:"78%", status:"fresh"},
+  "The Deer Hunter": {tomatometer:"93%", status:"fresh"},
+  "Fair Game": {tomatometer:"83%", status:"fresh"},
+  "Le Week-End": {tomatometer:"80%", status:"fresh"},
+  "The Road": {tomatometer:"75%", status:"fresh"},
+  "Chopper": {tomatometer:"89%", status:"fresh"},
+  "Sucker Punch": {tomatometer:"23%", status:"rotten"},
+  "Her": {tomatometer:"94%", status:"fresh"},
+  "The White Ribbon": {tomatometer:"90%", status:"fresh"},
+  "Funny Games": {tomatometer:"68%", status:"fresh"},
+  "Caché (Hidden)": {tomatometer:"90%", status:"fresh"},
+  "Quadrophenia": {tomatometer:"95%", status:"fresh"},
+  "House of Games": {tomatometer:"89%", status:"fresh"},
+  "Superbad": {tomatometer:"88%", status:"fresh"},
+  "Finding Forrester": {tomatometer:"75%", status:"fresh"},
+  "No Country for Old Men": {tomatometer:"93%", status:"fresh"},
+  "Stoker": {tomatometer:"68%", status:"fresh"},
+  "Carrie": {tomatometer:"93%", status:"fresh"},
+  "Pensionat Oskar": {tomatometer:"N/A", status:"unknown"},
+  "Efterskalv": {tomatometer:"N/A", status:"unknown"},
+  "The Square": {tomatometer:"92%", status:"fresh"},
+  "The Last Sentence": {tomatometer:"96%", status:"fresh"},
+  "Vi är bäst!": {tomatometer:"97%", status:"fresh"},
+  "Let the Right One In": {tomatometer:"98%", status:"fresh"},
+  "Hundtricket": {tomatometer:"N/A", status:"unknown"},
+  "Jätten": {tomatometer:"N/A", status:"unknown"},
+  "Återträffen": {tomatometer:"N/A", status:"unknown"},
+  "Mig äger ingen": {tomatometer:"N/A", status:"unknown"},
+  "Enkel resa till Antibes": {tomatometer:"N/A", status:"unknown"},
+  "Kan du vissla Johanna": {tomatometer:"N/A", status:"unknown"},
+  "Kungen av Strandvägen": {tomatometer:"N/A", status:"unknown"},
+  "Sagolandet": {tomatometer:"N/A", status:"unknown"},
+  "Somliga går i trasiga skor": {tomatometer:"N/A", status:"unknown"},
+  "Förvaret": {tomatometer:"N/A", status:"unknown"},
+  "Suecia: Paraíso y Infierno": {tomatometer:"N/A", status:"unknown"},
+  "PBS: Divided States of America": {tomatometer:"N/A", status:"unknown"},
+  "Oslo Stories – Love": {tomatometer:"N/A", status:"unknown"},
+  "Hitler: The Rise of Evil": {tomatometer:"N/A", status:"unknown"},
+  "A Big Bold Beautiful Journey": {tomatometer:"N/A", status:"unknown"},
+  "Problemista": {tomatometer:"87%", status:"fresh"}
+};
+
+function fetchRT(title, year, elId) {
+  var el = document.getElementById('rt-' + elId);
+  if (!el) return;
+  var cacheKey = title + '|' + year;
+  var result = rtCache[cacheKey] || RT_SCORES[title] || {tomatometer:"N/A", status:"unknown"};
+  if (!rtCache[cacheKey]) { rtCache[cacheKey] = result; saveRT(); }
+  applyRT(el, result);
+}
+
+function applyRT(el, result) {
+  if (!el) return;
+  var score = result.tomatometer || 'N/A';
+  var status = result.status || 'unknown';
+  var emoji = status === 'fresh' ? '🍅' : status === 'rotten' ? '🦠' : '🎬';
+  el.innerHTML = '<span class="rt-tomato">'+emoji+'</span> ' + score;
+  el.classList.remove('loading');
+  el.classList.remove('fresh','rotten');
+  if (status === 'fresh') el.classList.add('fresh');
+  else if (status === 'rotten') el.classList.add('rotten');
+}
+
+function toggleSeen(card, sk, items) {
+  seen[sk] = !seen[sk];
+  save();
+  card.classList.toggle('seen', seen[sk]);
+  var btn = card.querySelector('.seen-btn');
+  if (btn) btn.textContent = seen[sk] ? '✓ Seen — undo' : '+ Mark as seen';
+  var seenCount = items.filter(function(i) { return !!seen[k(tab,i.t)]; }).length;
+  document.getElementById('stats').textContent = seenCount + ' / ' + items.length + ' seen';
+}
+
+function switchTab(targetTab) {
+  document.querySelectorAll('.tab').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelector('[data-tab="'+targetTab+'"]').classList.add('active');
+  tab = targetTab;
+  q = ''; document.getElementById('search').value = '';
+  filter = 'all';
+  document.querySelectorAll('.fbtn').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelector('[data-f="all"]').classList.add('active');
+  render();
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────
+function openModal(prefillTitle) {
+  document.getElementById('f-title').value = prefillTitle || '';
+  document.getElementById('f-director').value = '';
+  document.getElementById('f-actors').value = '';
+  document.getElementById('f-genre').value = '';
+  document.getElementById('f-year').value = '';
+  document.getElementById('f-note').value = '';
+  document.getElementById('f-list').value = tab !== 'directors' ? tab : 'films';
+  document.getElementById('modal-overlay').classList.add('open');
+  document.getElementById('f-title').focus();
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+
+document.getElementById('fab').addEventListener('click', function() { openModal(); });
+document.getElementById('modal-close').addEventListener('click', closeModal);
+document.getElementById('modal-overlay').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+document.getElementById('modal-submit').addEventListener('click', function() {
+  var title = document.getElementById('f-title').value.trim();
+  if (!title) { document.getElementById('f-title').focus(); return; }
+  var listKey = document.getElementById('f-list').value;
+  var newItem = {
+    t: title,
+    d: document.getElementById('f-director').value.trim() || 'Unknown',
+    a: document.getElementById('f-actors').value.trim() || '—',
+    g: document.getElementById('f-genre').value.trim() || '—',
+    y: document.getElementById('f-year').value.trim() || 'TBC',
+    n: document.getElementById('f-note').value.trim() || ''
+  };
+  if (!customItems[listKey]) customItems[listKey] = [];
+  customItems[listKey].push(newItem);
+  save();
+  closeModal();
+  switchTab(listKey);
+  showToast('Added "' + title + '"');
+});
+
+// ── Tab & filter events ───────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.tab').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    tab = btn.dataset.tab;
+    q = ''; document.getElementById('search').value = '';
+    render();
+  });
+});
+
+document.querySelectorAll('.fbtn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.fbtn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    filter = btn.dataset.f;
+    render();
+  });
+});
+
+document.getElementById('search').addEventListener('input', function(e) {
+  q = e.target.value;
+  render();
+});
+
+render();
+</script>
+</body>
+</html>
