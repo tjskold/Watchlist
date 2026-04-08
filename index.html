@@ -61,7 +61,7 @@
   }
   .tab.active { background: #1a1a1a; border-color: #1a1a1a; color: #fff; }
 
-  .filter-row { display: flex; gap: 6px; align-items: center; }
+  .filter-row { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
   .fbtn {
     padding: 6px 12px;
     border-radius: 20px;
@@ -73,6 +73,21 @@
   }
   .fbtn.active { background: #8b5e2a; border-color: #8b5e2a; color: #fff; }
   .stats { font-size: 12px; color: #999; margin-left: auto; }
+
+  .sort-row { display: flex; align-items: center; gap: 8px; }
+  .sort-label { font-size: 12px; color: #999; white-space: nowrap; }
+  #sort-select {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1.5px solid #ddd;
+    border-radius: 8px;
+    font-size: 13px;
+    background: #f7f5f2;
+    color: #1a1a1a;
+    outline: none;
+    cursor: pointer;
+  }
+  #sort-select:focus { border-color: #8b5e2a; }
 
   /* List */
   .list { padding: 12px 16px; }
@@ -318,6 +333,22 @@
     <button class="fbtn" data-f="seen">Seen</button>
     <span class="stats" id="stats"></span>
   </div>
+  <div class="sort-row" id="srow">
+    <span class="sort-label">Sort:</span>
+    <select id="sort-select">
+      <option value="default">Default</option>
+      <option value="title">Title A–Z</option>
+      <option value="year-asc">Year ↑</option>
+      <option value="year-desc">Year ↓</option>
+      <option value="genre">Genre A–Z</option>
+      <option value="director">Director A–Z</option>
+      <option value="rt-desc">RT Score ↓</option>
+      <option value="seen-first">Seen first</option>
+      <option value="unseen-first">Unseen first</option>
+      <option value="added-desc">Recently added</option>
+      <option value="shuffle">🔀 Shuffle</option>
+    </select>
+  </div>
 </header>
 
 <div class="list" id="list"></div>
@@ -540,26 +571,31 @@ var DIRECTORS = [
 ];
 
 // ── State ─────────────────────────────────────────────────────────────────
-var seen = {}, customItems = {films:[], svenska:[], tv:[]}, customDirectors = [];
+var seen = {}, customItems = {films:[], svenska:[], tv:[]}, customDirectors = [], deleted = {}, deletedDirs = [];
 try {
   seen = JSON.parse(localStorage.getItem('wl4_seen') || '{}');
   customItems = JSON.parse(localStorage.getItem('wl4_custom') || '{"films":[],"svenska":[],"tv":[]}');
   customDirectors = JSON.parse(localStorage.getItem('wl4_dirs') || '[]');
+  deleted = JSON.parse(localStorage.getItem('wl4_deleted') || '{}');
+  deletedDirs = JSON.parse(localStorage.getItem('wl4_deldirs') || '[]');
 } catch(e) {}
 
-var tab = 'films', filter = 'all', q = '';
+var tab = 'films', filter = 'all', q = '', sort = 'default';
 
 function save() {
   try {
     localStorage.setItem('wl4_seen', JSON.stringify(seen));
     localStorage.setItem('wl4_custom', JSON.stringify(customItems));
     localStorage.setItem('wl4_dirs', JSON.stringify(customDirectors));
+    localStorage.setItem('wl4_deleted', JSON.stringify(deleted));
+    localStorage.setItem('wl4_deldirs', JSON.stringify(deletedDirs));
   } catch(e) {}
 }
 
 function getItems(tb) {
   var base = tb === 'films' ? BASE_FILMS : tb === 'svenska' ? BASE_SVENSKA : BASE_TV;
-  return base.concat(customItems[tb] || []);
+  var del = deleted[tb] || [];
+  return base.filter(function(i) { return del.indexOf(i.t) === -1; }).concat(customItems[tb] || []);
 }
 
 function k(tb, title) { return tb + '::' + title; }
@@ -581,9 +617,10 @@ function render() {
   // ── Directors tab ──────────────────────────────────────────────────────
   if (tab === 'directors') {
     frow.style.display = 'none';
+    document.getElementById('srow').style.display = 'none';
   
 
-    var allDirs = DIRECTORS.concat(customDirectors);
+    var allDirs = DIRECTORS.filter(function(d) { return deletedDirs.indexOf(d.name) === -1; }).concat(customDirectors);
     var lbl = document.createElement('div');
     lbl.className = 'section-label';
     lbl.textContent = allDirs.length + ' directors — tap to explore films';
@@ -623,7 +660,10 @@ function render() {
           '<div class="dcard-films-label">Films</div>' +
           '<div>'+pillsHtml+'</div>' +
           '<div class="dcard-note">Green = on your watchlist &nbsp;·&nbsp; Gold = not added yet</div>' +
-          (isCustom ? '<button class="delete-btn" style="margin-top:12px">Delete director</button>' : '') +
+          '<div class="action-row" style="margin-top:12px">' +
+            '<button class="edit-btn">Edit</button>' +
+            '<button class="delete-btn">Delete</button>' +
+          '</div>' +
         '</div>';
 
       // Expand/collapse
@@ -631,19 +671,25 @@ function render() {
         card.classList.toggle('open');
       });
 
-      // Delete custom director
-      if (isCustom) {
-        var delBtn = card.querySelector('.delete-btn');
-        if (delBtn) {
-          delBtn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            customDirectors = customDirectors.filter(function(d) { return d.name !== dir.name; });
-            save();
-            showToast('Removed "' + dir.name + '"');
-            render();
-          });
+      // Edit director
+      card.querySelector('.edit-btn').addEventListener('click', function(e) {
+        e.stopPropagation();
+        openEditDirModal(dir, isCustom);
+      });
+
+      // Delete director
+      card.querySelector('.delete-btn').addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (!confirm('Delete "' + dir.name + '" from directors?')) return;
+        if (isCustom) {
+          customDirectors = customDirectors.filter(function(d) { return d.name !== dir.name; });
+        } else {
+          deletedDirs.push(dir.name);
         }
-      }
+        save();
+        showToast('Deleted "' + dir.name + '"');
+        render();
+      });
 
       // Film pill clicks
       card.querySelectorAll('.film-pill').forEach(function(pill) {
@@ -680,6 +726,7 @@ function render() {
 
   // ── Film/TV tabs ───────────────────────────────────────────────────────
   frow.style.display = 'flex';
+  document.getElementById('srow').style.display = 'flex';
   document.getElementById('fab').style.display = 'flex';
 
   var items = getItems(tab);
@@ -695,6 +742,42 @@ function render() {
                 (item.a||'').toLowerCase().indexOf(sq) >= 0)) return false;
     return true;
   });
+
+  // ── Sort ────────────────────────────────────────────────────────────────
+  function rtVal(title) {
+    var sc = RT_SCORES[title];
+    if (!sc || sc.tomatometer === 'N/A') return -1;
+    return parseInt(sc.tomatometer) || -1;
+  }
+  function yearVal(y) {
+    if (!y || y === 'TBC') return 0;
+    return parseInt(String(y).replace(/[^0-9]/g,'').slice(0,4)) || 0;
+  }
+
+  if (sort === 'title') {
+    visible.sort(function(a,b){ return a.t.localeCompare(b.t); });
+  } else if (sort === 'year-asc') {
+    visible.sort(function(a,b){ return yearVal(a.y) - yearVal(b.y); });
+  } else if (sort === 'year-desc') {
+    visible.sort(function(a,b){ return yearVal(b.y) - yearVal(a.y); });
+  } else if (sort === 'genre') {
+    visible.sort(function(a,b){ return a.g.localeCompare(b.g); });
+  } else if (sort === 'director') {
+    visible.sort(function(a,b){ return a.d.localeCompare(b.d); });
+  } else if (sort === 'rt-desc') {
+    visible.sort(function(a,b){ return rtVal(b.t) - rtVal(a.t); });
+  } else if (sort === 'seen-first') {
+    visible.sort(function(a,b){ return (seen[k(tab,b.t)]?1:0) - (seen[k(tab,a.t)]?1:0); });
+  } else if (sort === 'unseen-first') {
+    visible.sort(function(a,b){ return (seen[k(tab,a.t)]?1:0) - (seen[k(tab,b.t)]?1:0); });
+  } else if (sort === 'added-desc') {
+    visible.sort(function(a,b){ return (b.added||0) - (a.added||0); });
+  } else if (sort === 'shuffle') {
+    for (var i = visible.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = visible[i]; visible[i] = visible[j]; visible[j] = tmp;
+    }
+  }
 
   var seenCount = items.filter(function(i) { return !!seen[k(tab,i.t)]; }).length;
   document.getElementById('stats').textContent = seenCount + ' / ' + items.length + ' seen';
@@ -742,7 +825,8 @@ function render() {
         '<div class="rt-row"><span class="dlabel">Rotten<br>Tomatoes</span><span class="rt-score loading" id="rt-'+sk.replace(/[^a-z0-9]/gi,'-')+'">fetching…</span></div>' +
         '<div class="action-row">' +
           '<button class="seen-btn">'+(isSeen ? '✓ Seen — undo' : '+ Mark as seen')+'</button>' +
-          (isCustom ? '<button class="delete-btn">Delete</button>' : '') +
+          '<button class="edit-btn">Edit</button>' +
+          '<button class="delete-btn">Delete</button>' +
         '</div>' +
       '</div>';
 
@@ -764,16 +848,26 @@ function render() {
       toggleSeen(card, sk, items);
     });
 
-    if (isCustom) {
-      card.querySelector('.delete-btn').addEventListener('click', function(e) {
-        e.stopPropagation();
+    card.querySelector('.edit-btn').addEventListener('click', function(e) {
+      e.stopPropagation();
+      openEditModal(item, tab);
+    });
+
+    card.querySelector('.delete-btn').addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (!confirm('Delete "' + item.t + '" from your list?')) return;
+      // Remove from custom list if custom, otherwise add to deleted set
+      if (isCustom) {
         customItems[tab] = (customItems[tab] || []).filter(function(c) { return c.t !== item.t; });
-        delete seen[sk];
-        save();
-        showToast('Removed "' + item.t + '"');
-        render();
-      });
-    }
+      } else {
+        deleted[tab] = deleted[tab] || [];
+        if (deleted[tab].indexOf(item.t) === -1) deleted[tab].push(item.t);
+      }
+      delete seen[sk];
+      save();
+      showToast('Deleted "' + item.t + '"');
+      render();
+    });
 
     listEl.appendChild(card);
   });
@@ -940,6 +1034,7 @@ function switchTab(targetTab) {
   document.querySelector('[data-tab="'+targetTab+'"]').classList.add('active');
   tab = targetTab;
   q = ''; document.getElementById('search').value = '';
+  sort = 'default'; document.getElementById('sort-select').value = 'default';
   filter = 'all';
   document.querySelectorAll('.fbtn').forEach(function(b) { b.classList.remove('active'); });
   document.querySelector('[data-f="all"]').classList.add('active');
@@ -947,13 +1042,17 @@ function switchTab(targetTab) {
 }
 
 // ── Modal ─────────────────────────────────────────────────────────────────
+var modalMode = 'add'; // 'add' | 'edit'
+var editTarget = null; // {type:'film'|'dir', item, tab, isCustom}
+
 function openModal(prefillTitle) {
+  modalMode = 'add';
+  editTarget = null;
   var isDir = tab === 'directors';
   document.getElementById('modal-title').childNodes[0].textContent = isDir ? 'Add Director ' : 'Add to Watchlist ';
   document.getElementById('film-fields').style.display = isDir ? 'none' : 'block';
   document.getElementById('director-fields').style.display = isDir ? 'block' : 'none';
-  document.getElementById('modal-submit').textContent = isDir ? 'Add Director' : 'Add to Watchlist';
-
+  document.getElementById('modal-submit').textContent = isDir ? 'Add Director' : 'Add Film';
   if (isDir) {
     document.getElementById('d-name').value = prefillTitle || '';
     document.getElementById('d-country').value = '';
@@ -974,8 +1073,44 @@ function openModal(prefillTitle) {
   }
 }
 
+function openEditModal(item, itemTab) {
+  modalMode = 'edit';
+  var isCustom = (customItems[itemTab] || []).some(function(c) { return c.t === item.t; });
+  editTarget = {type:'film', item:item, tab:itemTab, isCustom:isCustom};
+  document.getElementById('modal-title').childNodes[0].textContent = 'Edit Film ';
+  document.getElementById('film-fields').style.display = 'block';
+  document.getElementById('director-fields').style.display = 'none';
+  document.getElementById('modal-submit').textContent = 'Save Changes';
+  document.getElementById('f-title').value = item.t || '';
+  document.getElementById('f-director').value = item.d || '';
+  document.getElementById('f-actors').value = item.a || '';
+  document.getElementById('f-genre').value = item.g || '';
+  document.getElementById('f-year').value = item.y || '';
+  document.getElementById('f-note').value = item.n || '';
+  document.getElementById('f-list').value = itemTab;
+  document.getElementById('modal-overlay').classList.add('open');
+  document.getElementById('f-title').focus();
+}
+
+function openEditDirModal(dir, isCustom) {
+  modalMode = 'edit';
+  editTarget = {type:'dir', dir:dir, isCustom:isCustom};
+  document.getElementById('modal-title').childNodes[0].textContent = 'Edit Director ';
+  document.getElementById('film-fields').style.display = 'none';
+  document.getElementById('director-fields').style.display = 'block';
+  document.getElementById('modal-submit').textContent = 'Save Changes';
+  document.getElementById('d-name').value = dir.name || '';
+  document.getElementById('d-country').value = dir.country || '';
+  document.getElementById('d-films').value = Array.isArray(dir.films) ? dir.films.join(', ') : dir.films || '';
+  document.getElementById('d-style').value = dir.style || '';
+  document.getElementById('modal-overlay').classList.add('open');
+  document.getElementById('d-name').focus();
+}
+
 function closeModal() {
   document.getElementById('modal-overlay').classList.remove('open');
+  modalMode = 'add';
+  editTarget = null;
 }
 
 document.getElementById('fab').addEventListener('click', function() { openModal(); });
@@ -985,48 +1120,102 @@ document.getElementById('modal-overlay').addEventListener('click', function(e) {
 });
 
 document.getElementById('modal-submit').addEventListener('click', function() {
-  if (tab === 'directors') {
+  // ── Director add/edit ──────────────────────────────────────────────────
+  if (tab === 'directors' && modalMode === 'add') {
     var name = document.getElementById('d-name').value.trim();
     if (!name) { document.getElementById('d-name').focus(); return; }
-    var newDir = {
+    customDirectors.push({
       name: name,
       country: document.getElementById('d-country').value.trim() || '—',
       films: document.getElementById('d-films').value.trim().split(',').map(function(s){ return s.trim(); }).filter(Boolean),
       style: document.getElementById('d-style').value.trim() || '—'
+    });
+    save(); closeModal(); showToast('Added "' + name + '"'); render();
+    return;
+  }
+
+  if (modalMode === 'edit' && editTarget && editTarget.type === 'dir') {
+    var newName = document.getElementById('d-name').value.trim();
+    if (!newName) { document.getElementById('d-name').focus(); return; }
+    var updated = {
+      name: newName,
+      country: document.getElementById('d-country').value.trim() || '—',
+      films: document.getElementById('d-films').value.trim().split(',').map(function(s){ return s.trim(); }).filter(Boolean),
+      style: document.getElementById('d-style').value.trim() || '—'
     };
-    customDirectors.push(newDir);
-    save();
-    closeModal();
-    showToast('Added "' + name + '"');
-    render();
-  } else {
-    var title = document.getElementById('f-title').value.trim();
-    if (!title) { document.getElementById('f-title').focus(); return; }
-    var listKey = document.getElementById('f-list').value;
-    var newItem = {
-      t: title,
+    if (editTarget.isCustom) {
+      customDirectors = customDirectors.map(function(d) { return d.name === editTarget.dir.name ? updated : d; });
+    } else {
+      // Move base director to custom with edits, mark original deleted
+      deletedDirs.push(editTarget.dir.name);
+      customDirectors.push(updated);
+    }
+    save(); closeModal(); showToast('Updated "' + newName + '"'); render();
+    return;
+  }
+
+  // ── Film add/edit ──────────────────────────────────────────────────────
+  if (modalMode === 'edit' && editTarget && editTarget.type === 'film') {
+    var newTitle = document.getElementById('f-title').value.trim();
+    if (!newTitle) { document.getElementById('f-title').focus(); return; }
+    var newListKey = document.getElementById('f-list').value;
+    var updatedItem = {
+      t: newTitle,
       d: document.getElementById('f-director').value.trim() || 'Unknown',
       a: document.getElementById('f-actors').value.trim() || '—',
       g: document.getElementById('f-genre').value.trim() || '—',
       y: document.getElementById('f-year').value.trim() || 'TBC',
       n: document.getElementById('f-note').value.trim() || ''
     };
-    if (!customItems[listKey]) customItems[listKey] = [];
-    customItems[listKey].push(newItem);
-    save();
-    closeModal();
-    switchTab(listKey);
-    showToast('Added "' + title + '"');
+    var oldTab = editTarget.tab;
+    var oldTitle = editTarget.item.t;
+    var oldSk = k(oldTab, oldTitle);
+    var wasSeen = !!seen[oldSk];
+    if (editTarget.isCustom) {
+      customItems[oldTab] = (customItems[oldTab] || []).filter(function(c) { return c.t !== oldTitle; });
+      if (!customItems[newListKey]) customItems[newListKey] = [];
+      customItems[newListKey].push(updatedItem);
+    } else {
+      // Mark base item deleted, add updated version to custom
+      deleted[oldTab] = deleted[oldTab] || [];
+      if (deleted[oldTab].indexOf(oldTitle) === -1) deleted[oldTab].push(oldTitle);
+      if (!customItems[newListKey]) customItems[newListKey] = [];
+      customItems[newListKey].push(updatedItem);
+    }
+    delete seen[oldSk];
+    if (wasSeen) seen[k(newListKey, newTitle)] = true;
+    save(); closeModal();
+    showToast('Updated "' + newTitle + '"');
+    switchTab(newListKey);
+    return;
   }
+
+  // ── Film add ──────────────────────────────────────────────────────────
+  var title = document.getElementById('f-title').value.trim();
+  if (!title) { document.getElementById('f-title').focus(); return; }
+  var listKey = document.getElementById('f-list').value;
+  var newItem = {
+    t: title,
+    d: document.getElementById('f-director').value.trim() || 'Unknown',
+    a: document.getElementById('f-actors').value.trim() || '—',
+    g: document.getElementById('f-genre').value.trim() || '—',
+    y: document.getElementById('f-year').value.trim() || 'TBC',
+    n: document.getElementById('f-note').value.trim() || '',
+    added: Date.now()
+  };
+  if (!customItems[listKey]) customItems[listKey] = [];
+  customItems[listKey].push(newItem);
+  save(); closeModal(); switchTab(listKey); showToast('Added "' + title + '"');
 });
 
-// ── Tab & filter events ───────────────────────────────────────────────────
+// ── Tab & filter & sort events ────────────────────────────────────────────
 document.querySelectorAll('.tab').forEach(function(btn) {
   btn.addEventListener('click', function() {
     document.querySelectorAll('.tab').forEach(function(b) { b.classList.remove('active'); });
     btn.classList.add('active');
     tab = btn.dataset.tab;
     q = ''; document.getElementById('search').value = '';
+    sort = 'default'; document.getElementById('sort-select').value = 'default';
     render();
   });
 });
@@ -1038,6 +1227,13 @@ document.querySelectorAll('.fbtn').forEach(function(btn) {
     filter = btn.dataset.f;
     render();
   });
+});
+
+document.getElementById('sort-select').addEventListener('change', function() {
+  sort = this.value;
+  render();
+  // Re-randomise each time shuffle is picked
+  if (sort === 'shuffle') this.value = 'shuffle';
 });
 
 document.getElementById('search').addEventListener('input', function(e) {
